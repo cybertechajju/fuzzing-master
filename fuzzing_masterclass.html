@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Ultimate Fuzzing Masterclass — CybertechAjju</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* CSS Variables */
+        :root {
+            --bg-color: #060608;
+            --text-color: #d1d5db;
+            --cyan: #00f5ff;
+            --green: #39ff14;
+            --red: #ff2d55;
+            --orange: #ff9500;
+            --sidebar-bg: rgba(10, 10, 15, 0.85);
+            --card-bg: rgba(20, 20, 28, 0.7);
+            --terminal-bg: rgba(10, 10, 15, 0.95);
+            --terminal-header: #1f1f2e;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 245, 255, 0.3);
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--cyan);
+        }
+
+        /* Base Styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.7;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 300;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        code, pre {
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Matrix Canvas */
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -2;
+            opacity: 0.15;
+        }
+
+        /* CRT Scanline Effect */
+        .crt::before {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 999;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        /* Layout */
+        .container {
+            display: flex;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            padding: 30px 20px;
+            border-right: 1px solid rgba(0, 245, 255, 0.2);
+            box-shadow: 5px 0 25px rgba(0, 0, 0, 0.5);
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        .sidebar h3 {
+            color: var(--cyan);
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            font-size: 1.2rem;
+            text-shadow: 0 0 5px var(--cyan);
+        }
+
+        .sidebar ul {
+            list-style: none;
+        }
+
+        .sidebar li {
+            margin-bottom: 10px;
+        }
+
+        .sidebar a {
+            color: var(--text-color);
+            text-decoration: none;
+            display: block;
+            padding: 8px 10px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .sidebar a:hover, .sidebar a.active {
+            background-color: rgba(0, 245, 255, 0.15);
+            color: var(--cyan);
+            padding-left: 15px;
+            border-left: 4px solid var(--cyan);
+            box-shadow: inset 20px 0 20px -20px var(--cyan);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 50px 60px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 80px 0;
+            margin-bottom: 40px;
+            border-bottom: 1px solid rgba(0, 245, 255, 0.3);
+        }
+
+        /* Glitch Effect */
+        .glitch {
+            font-size: 3rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            position: relative;
+            color: white;
+            text-shadow: 0 0 10px var(--cyan);
+            display: inline-block;
+        }
+
+        .glitch::before, .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-color);
+        }
+
+        .glitch::before {
+            left: 2px;
+            text-shadow: -2px 0 var(--red);
+            clip: rect(24px, 550px, 90px, 0);
+            animation: glitch-anim-2 3s infinite linear alternate-reverse;
+        }
+
+        .glitch::after {
+            left: -2px;
+            text-shadow: -2px 0 var(--cyan);
+            clip: rect(85px, 550px, 140px, 0);
+            animation: glitch-anim 2.5s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim {
+            0% { clip: rect(10px, 9999px, 83px, 0); }
+            20% { clip: rect(35px, 9999px, 15px, 0); }
+            40% { clip: rect(81px, 9999px, 49px, 0); }
+            60% { clip: rect(18px, 9999px, 7px, 0); }
+            80% { clip: rect(97px, 9999px, 98px, 0); }
+            100% { clip: rect(23px, 9999px, 82px, 0); }
+        }
+
+        @keyframes glitch-anim-2 {
+            0% { clip: rect(65px, 9999px, 100px, 0); }
+            20% { clip: rect(20px, 9999px, 80px, 0); }
+            40% { clip: rect(40px, 9999px, 10px, 0); }
+            60% { clip: rect(80px, 9999px, 40px, 0); }
+            80% { clip: rect(10px, 9999px, 90px, 0); }
+            100% { clip: rect(50px, 9999px, 30px, 0); }
+        }
+
+        .hero-subtitle {
+            color: var(--cyan);
+            margin-top: 10px;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+        }
+
+        /* Sections & Typography */
+        section {
+            margin-bottom: 60px;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+            border-left: 4px solid var(--cyan);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(0, 245, 255, 0.1);
+        }
+
+        h1, h2, h3, h4 {
+            color: #fff;
+            margin-bottom: 15px;
+        }
+
+        h2 {
+            font-size: 2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 10px;
+            color: var(--cyan);
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            margin-top: 30px;
+            color: var(--green);
+        }
+
+        p {
+            margin-bottom: 15px;
+        }
+
+        ul, ol {
+            margin-bottom: 15px;
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-left: 10px;
+            vertical-align: middle;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .badge.beginner { background-color: rgba(57, 255, 20, 0.2); color: var(--green); border: 1px solid var(--green); }
+        .badge.intermediate { background-color: rgba(255, 149, 0, 0.2); color: var(--orange); border: 1px solid var(--orange); }
+        .badge.advanced { background-color: rgba(255, 45, 85, 0.2); color: var(--red); border: 1px solid var(--red); }
+        .badge.protip { background-color: rgba(0, 245, 255, 0.2); color: var(--cyan); border: 1px solid var(--cyan); }
+        .badge.underrated { background-color: rgba(186, 85, 211, 0.2); color: #ba55d3; border: 1px solid #ba55d3; }
+
+        /* Reveal Button */
+        .reveal-btn {
+            background-color: transparent;
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-top: 10px;
+            transition: all 0.2s;
+        }
+
+        .reveal-btn:hover {
+            background-color: rgba(0, 245, 255, 0.1);
+        }
+
+        /* Terminal Code Blocks */
+        .terminal {
+            background-color: var(--terminal-bg);
+            border-radius: 6px;
+            margin: 20px 0;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .terminal-header {
+            background-color: var(--terminal-header);
+            padding: 8px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .terminal-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn-mac {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .btn-close { background-color: #ff5f56; }
+        .btn-min { background-color: #ffbd2e; }
+        .btn-max { background-color: #27c93f; }
+
+        .copy-btn {
+            background: none;
+            border: 1px solid var(--cyan);
+            color: var(--cyan);
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: rgba(0, 245, 255, 0.2);
+        }
+
+        .terminal-body {
+            padding: 15px;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        .terminal-body pre {
+            margin: 0;
+            font-family: 'Courier New', Courier, monospace;
+            color: #a8cc8c; /* default code color */
+        }
+        
+        .syntax-cmd { color: var(--cyan); }
+        .syntax-flag { color: var(--orange); }
+        .syntax-arg { color: #fff; }
+        .syntax-comment { color: #6272a4; font-style: italic; }
+
+        .blinking-cursor::after {
+            content: "█";
+            animation: blink 1s step-end infinite;
+            color: var(--green);
+            margin-left: 5px;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* Impact Meter */
+        .impact-container {
+            margin: 15px 0;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .impact-label {
+            font-weight: bold;
+            font-size: 0.9rem;
+            width: 150px;
+        }
+
+        .impact-bar-bg {
+            flex: 1;
+            height: 10px;
+            background: #222;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .impact-bar {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 1s ease-in-out;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .impact-low { width: 25%; background-color: var(--green); color: var(--green); }
+        .impact-medium { width: 50%; background-color: var(--orange); color: var(--orange); }
+        .impact-high { width: 75%; background-color: var(--red); color: var(--red); }
+        .impact-critical { width: 100%; background-color: #ba55d3; color: #ba55d3; animation: pulse 1.5s infinite; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 5px #ba55d3; }
+            50% { box-shadow: 0 0 20px #ba55d3; }
+            100% { box-shadow: 0 0 5px #ba55d3; }
+        }
+
+        /* ASCII Diagram */
+        .ascii-diagram {
+            font-family: monospace;
+            white-space: pre;
+            background: #000;
+            color: var(--green);
+            padding: 20px;
+            border: 1px solid var(--green);
+            border-radius: 5px;
+            overflow-x: auto;
+            text-align: center;
+            margin: 20px 0;
+            text-shadow: 0 0 5px var(--green);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+            text-align: left;
+        }
+
+        th {
+            background-color: rgba(0, 245, 255, 0.1);
+            color: var(--cyan);
+        }
+
+        /* Collapsible Cheatsheet */
+        .collapsible {
+            background-color: var(--terminal-header);
+            color: white;
+            cursor: pointer;
+            padding: 18px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 1.1rem;
+            border-radius: 5px;
+            margin-top: 10px;
+            border-left: 3px solid var(--cyan);
+            transition: 0.4s;
+        }
+
+        .active, .collapsible:hover {
+            background-color: #2a2a35;
+        }
+
+        .content {
+            padding: 0 18px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.2s ease-out;
+            background-color: var(--card-bg);
+            border-left: 3px solid var(--cyan);
+            border-bottom-right-radius: 5px;
+        }
+
+        /* Back to top */
+        #btn-back-to-top {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: none;
+            background-color: var(--cyan);
+            color: #000;
+            border: none;
+            padding: 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 0 15px var(--cyan);
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+
+        #btn-back-to-top:hover {
+            transform: scale(1.1);
+            background-color: #fff;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            margin-top: 40px;
+            border-top: 1px solid rgba(0, 245, 255, 0.3);
+            background-color: var(--card-bg);
+        }
+
+        .neon-text {
+            color: #fff;
+            text-shadow:
+                0 0 5px #fff,
+                0 0 10px #fff,
+                0 0 20px var(--cyan),
+                0 0 40px var(--cyan),
+                0 0 80px var(--cyan);
+            animation: neon-pulse 2s infinite alternate;
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .footer-sig {
+             color: var(--cyan);
+             font-weight: bold;
+             letter-spacing: 2px;
+        }
+
+        @keyframes neon-pulse {
+            from { text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 20px var(--cyan), 0 0 40px var(--cyan); }
+            to { text-shadow: 0 0 2px #fff, 0 0 5px #fff, 0 0 10px var(--cyan), 0 0 20px var(--cyan); }
+        }
+
+        /* Responsive */
+        @media (max-width: 992px) {
+            .container { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--cyan); }
+        }
+    </style>
+</head>
+<body class="crt">
+    <canvas id="matrix-canvas"></canvas>
+
+    <div class="disclaimer-banner">
+        ⚠️ <strong>DISCLAIMER:</strong> This material is for EDUCATIONAL PURPOSES ONLY. Unauthorized hacking is illegal. Use these techniques only on systems you have explicit permission to test (e.g., authorized Bug Bounty programs).
+    </div>
+
+    <style>
+        .disclaimer-banner {
+            background-color: rgba(255, 45, 85, 0.15);
+            border: 1px solid var(--red);
+            color: #ffb3c1;
+            text-align: center;
+            padding: 15px;
+            font-size: 0.9rem;
+            position: relative;
+            z-index: 100;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+    </style>
+
+    <div class="container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <h3>Index</h3>
+            <ul>
+                <li><a href="#sec0">0. What is Fuzzing?</a></li>
+                <li><a href="#sec1">1. Fuzzing Types</a></li>
+                <li><a href="#sec2">2. Tools Deep Dive</a></li>
+                <li><a href="#sec3">3. Wordlists</a></li>
+                <li><a href="#sec4">4. Advanced Techniques</a></li>
+                <li><a href="#sec5">5. Underrated Tips</a></li>
+                <li><a href="#sec6">6. AI in Fuzzing (2026)</a></li>
+                <li><a href="#sec7">7. Bug Bounty Chaining</a></li>
+                <li><a href="#sec8">8. Cheatsheet</a></li>
+                <li><a href="#sec9">9. Resources</a></li>
+                <li><a href="#sec10">10. Top 10 MCQs</a></li>
+                <li><a href="#sec11">11. Hacker Q&A</a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="hero">
+                <div class="glitch" data-text="The Ultimate Fuzzing Masterclass">The Ultimate Fuzzing Masterclass</div>
+                <div class="hero-subtitle">Advanced Penetration Testing & Bug Bounty Techniques — 2026 Edition</div>
+                <p style="color: var(--green); margin-top:15px; font-size:0.9rem;">by CybertechAjju | Updated for 2026 Modern Stacks</p>
+            </header>
+
+            <!-- SECTION 0 -->
+            <section id="sec0">
+                <h2>0. WHAT IS FUZZING? <span class="badge beginner">Beginner</span></h2>
+                <ul>
+                    <li><strong>Definition:</strong> Automated process of sending massive amounts of payloads to discover hidden assets or trigger vulnerabilities.</li>
+                    <li><strong>Analogy:</strong> A robot rapidly trying 50,000 different keys in 10,000 locked doors in seconds.</li>
+                    <li><strong>Why it matters:</strong> Standard pentesting tests what is visible. Bug bounty requires finding the <em>invisible</em> attack surface.</li>
+                    <li><strong>The Mindset:</strong> Don't just look for <code>200 OK</code>. Look for anomalies (weird 403s, unexpected response sizes, or time delays). Anomalies = Vulnerabilities.</li>
+                </ul>
+
+                <div class="ascii-diagram">
++-------------+      +-------------+      +---------------+      +---------------+
+|    RECON    | ---> |   FUZZING   | ---> |   DISCOVERY   | ---> | EXPLOITATION  |
+| (Subdomains,|      | (ffuf,      |      | (Hidden APIs, |      | (IDOR, SSRF,  |
+|  Ports, JS) |      |  wfuzz)     |      |  Configs)     |      |  RCE, PII)    |
++-------------+      +-------------+      +---------------+      +---------------+
+                </div>
+            </section>
+
+            <!-- SECTION 1 -->
+            <section id="sec1">
+                <h2>1. FUZZING TYPES <span class="badge intermediate">Intermediate</span></h2>
+                
+                <ul>
+                    <li><strong>1. Directory Fuzzing:</strong> 
+                        <ul>
+                            <li><strong>Goal:</strong> Guessing folder names (<code>/admin/</code>, <code>/backup/</code>).</li>
+                            <li><strong>Bugs:</strong> Exposed panels, source code leaks.</li>
+                            <li><strong>Tools:</strong> ffuf, gobuster, feroxbuster.</li>
+                        </ul>
+                    </li>
+                    <li style="margin-top:10px;"><strong>2. Path / File Fuzzing:</strong>
+                        <ul>
+                            <li><strong>Goal:</strong> Guessing files/extensions (<code>config.php.bak</code>, <code>.env</code>).</li>
+                            <li><strong>Bugs:</strong> Hardcoded credentials, db backups.</li>
+                            <li><strong>Tools:</strong> ffuf, dirsearch.</li>
+                        </ul>
+                    </li>
+                    <li style="margin-top:10px;"><strong>3. Endpoint / API Fuzzing:</strong>
+                        <ul>
+                            <li><strong>Goal:</strong> Discovering hidden APIs/versions (<code>/api/v2/users</code>).</li>
+                            <li><strong>Bugs:</strong> BOLA/IDOR, Mass Assignment.</li>
+                            <li><strong>Tools:</strong> ffuf, kiterunner.</li>
+                        </ul>
+                    </li>
+                    <li style="margin-top:10px;"><strong>4. Parameter Fuzzing:</strong>
+                        <ul>
+                            <li><strong>Goal:</strong> Finding hidden inputs (<code>?debug=true</code>, hidden POST JSON keys).</li>
+                            <li><strong>Bugs:</strong> SSRF, SQLi, Command Injection.</li>
+                            <li><strong>Tools:</strong> arjun, x8.</li>
+                        </ul>
+                    </li>
+                    <li style="margin-top:10px;"><strong>5. Subdomain / Vhost Fuzzing:</strong>
+                        <ul>
+                            <li><strong>Goal:</strong> Brute-forcing Host headers or DNS.</li>
+                            <li><strong>Bugs:</strong> Internal dev access, subdomain takeover.</li>
+                            <li><strong>Tools:</strong> ffuf, gobuster.</li>
+                        </ul>
+                    </li>
+                </ul>
+            </section>
+
+            <!-- SECTION 2 -->
+            <section id="sec2">
+                <h2>2. TOOLS DEEP DIVE <span class="badge advanced">Advanced</span></h2>
+                
+                <h3>▸ FFUF (Fuzz Faster U Fool)</h3>
+                <p><strong>What & Why:</strong> The undisputed king of fuzzing. Extremely fast, written in Go, and highly customizable filtering.</p>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-buttons"><div class="btn-mac btn-close"></div><div class="btn-mac btn-min"></div><div class="btn-mac btn-max"></div></div>
+                        <span>Install</span>
+                    </div>
+                    <div class="terminal-body"><pre>go install github.com/ffuf/ffuf/v2@latest</pre></div>
+                </div>
+
+                <table>
+                    <tr><th>Flag</th><th>Meaning</th></tr>
+                    <tr><td><code>-w</code></td><td>Wordlist path (can use multiple: <code>-w w1.txt:FUZZ -w w2.txt:W2</code>)</td></tr>
+                    <tr><td><code>-u</code></td><td>Target URL (use <code>FUZZ</code> keyword where payload goes)</td></tr>
+                    <tr><td><code>-mc</code></td><td>Match HTTP Status Codes (e.g., <code>-mc 200,301,302</code> or <code>-mc all</code>)</td></tr>
+                    <tr><td><code>-fc</code> / <code>-fs</code></td><td>Filter Codes / Filter Size (removes false positives)</td></tr>
+                    <tr><td><code>-fw</code> / <code>-fl</code></td><td>Filter by Word count / Line count in response</td></tr>
+                    <tr style="background: rgba(0,245,255,0.05); border-left: 3px solid var(--cyan);"><td><code style="color:var(--cyan);font-weight:bold;">-ac</code></td><td><strong style="color:var(--cyan);">Auto-Calibrate filtering!</strong> ffuf automatically detects the "default" response and filters it out. <strong>This is the #1 flag most beginners don't know about.</strong> Instead of manually figuring out -fs or -fc, just use <code>-ac</code> and ffuf does it for you. Game changer for VHOST and directory fuzzing.</td></tr>
+                    <tr><td><code>-acc</code></td><td>Custom auto-calibrate string — use with <code>-acc "keyword"</code> to calibrate on a specific word in the response.</td></tr>
+                    <tr><td><code>-H</code></td><td>Add custom header (e.g., <code>-H "Cookie: session=123"</code>)</td></tr>
+                    <tr><td><code>-X</code></td><td>HTTP method (GET, POST, PUT, DELETE, PATCH)</td></tr>
+                    <tr><td><code>-d</code></td><td>POST data body (e.g., <code>-d '{"key":"FUZZ"}'</code>)</td></tr>
+                    <tr><td><code>-e</code></td><td>Comma-separated list of extensions to append (e.g., <code>-e .php,.bak,.env</code>)</td></tr>
+                    <tr><td><code>-recursion</code></td><td>Enable recursive fuzzing (follow discovered directories)</td></tr>
+                    <tr><td><code>-recursion-depth</code></td><td>Max recursion depth (default: 0 = infinite)</td></tr>
+                    <tr><td><code>-rate</code></td><td>Rate limit: max requests per second (e.g., <code>-rate 100</code>)</td></tr>
+                    <tr><td><code>-t</code></td><td>Number of concurrent threads (default: 40)</td></tr>
+                    <tr><td><code>-timeout</code></td><td>HTTP request timeout in seconds (default: 10)</td></tr>
+                    <tr><td><code>-x</code></td><td>Proxy URL (e.g., <code>-x http://127.0.0.1:8080</code> for Burp/Caido)</td></tr>
+                    <tr><td><code>-o</code></td><td>Output file (e.g., <code>-o results.json</code>)</td></tr>
+                    <tr><td><code>-of</code></td><td>Output format: json, ejson, html, md, csv, all</td></tr>
+                    <tr><td><code>-request</code></td><td>Use a raw HTTP request file (exported from Burp/Caido)</td></tr>
+                    <tr><td><code>-request-proto</code></td><td>Protocol for raw request (default: https)</td></tr>
+                    <tr><td><code>-mode</code></td><td>Multi-wordlist mode: <code>clusterbomb</code> (all combos) or <code>pitchfork</code> (paired)</td></tr>
+                    <tr><td><code>-ic</code></td><td>Ignore comments in wordlist (lines starting with #)</td></tr>
+                </table>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-buttons"><div class="btn-mac btn-close"></div><div class="btn-mac btn-min"></div><div class="btn-mac btn-max"></div></div>
+                        <span>ffuf Examples</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    </div>
+                    <div class="terminal-body">
+<pre><span class="syntax-comment"># 1. Basic Directory Fuzz</span>
+<span class="syntax-cmd">ffuf</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">wordlist.txt</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com/FUZZ</span> <span class="syntax-flag">-mc</span> <span class="syntax-arg">200,301</span>
+
+<span class="syntax-comment"># 2. AUTO-CALIBRATE — The most powerful flag! Let ffuf auto-filter noise</span>
+<span class="syntax-cmd">ffuf</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">wordlist.txt</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com/FUZZ</span> <span class="syntax-flag">-ac</span>
+
+<span class="syntax-comment"># 3. VHOST Fuzzing with -ac (no need to manually find -fs value!)</span>
+<span class="syntax-cmd">ffuf</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">subdomains.txt</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com</span> <span class="syntax-flag">-H</span> <span class="syntax-arg">"Host: FUZZ.target.com"</span> <span class="syntax-flag">-ac</span>
+
+<span class="syntax-comment"># 4. Extension Fuzzing with auto-calibrate</span>
+<span class="syntax-cmd">ffuf</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">wordlist.txt</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com/FUZZ</span> <span class="syntax-flag">-e</span> <span class="syntax-arg">.php,.bak,.env,.git,.zip</span> <span class="syntax-flag">-ac</span>
+
+<span class="syntax-comment"># 5. Fuzzing JSON POST body params with auto-calibrate</span>
+<span class="syntax-cmd">ffuf</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">params.txt</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://api.target.com/update</span> <span class="syntax-flag">-X</span> <span class="syntax-arg">POST</span> <span class="syntax-flag">-d</span> <span class="syntax-arg">'{"FUZZ":"admin"}'</span> <span class="syntax-flag">-H</span> <span class="syntax-arg">"Content-Type: application/json"</span> <span class="syntax-flag">-ac</span>
+
+<span class="syntax-comment"># 6. Recursive Fuzzing through Burp/Caido Proxy</span>
+<span class="syntax-cmd">ffuf</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">wordlist.txt</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com/FUZZ</span> <span class="syntax-flag">-recursion</span> <span class="syntax-flag">-recursion-depth</span> <span class="syntax-arg">3</span> <span class="syntax-flag">-x</span> <span class="syntax-arg">http://127.0.0.1:8080</span> <span class="syntax-flag">-ac</span>
+
+<span class="syntax-comment"># 7. Rate-limited fuzzing with output to JSON</span>
+<span class="syntax-cmd">ffuf</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">wordlist.txt</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com/FUZZ</span> <span class="syntax-flag">-ac</span> <span class="syntax-flag">-rate</span> <span class="syntax-arg">50</span> <span class="syntax-flag">-o</span> <span class="syntax-arg">results.json</span> <span class="syntax-flag">-of</span> <span class="syntax-arg">json</span>
+<span class="blinking-cursor"></span></pre>
+                    </div>
+                </div>
+                
+                <div class="impact-container">
+                    <div class="impact-label">Bug Bounty Impact</div>
+                    <div class="impact-bar-bg"><div class="impact-bar impact-critical"></div></div>
+                    <span>CRITICAL</span>
+                </div>
+
+                <hr style="border-color: rgba(255,255,255,0.1); margin: 30px 0;">
+
+                <h3>▸ Gobuster & Dirsearch</h3>
+                <p><strong>What & Why:</strong> Solid alternatives to ffuf.</p>
+                <div class="terminal">
+                    <div class="terminal-body"><pre><span class="syntax-comment"># Gobuster (DNS & Dir brute-forcing)</span>
+<span class="syntax-cmd">gobuster</span> <span class="syntax-flag">dir</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">wordlist.txt</span> <span class="syntax-flag">-t</span> <span class="syntax-arg">50</span>
+
+<span class="syntax-comment"># Dirsearch (Python-based, great default wordlist)</span>
+<span class="syntax-cmd">dirsearch</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com</span> <span class="syntax-flag">-e</span> <span class="syntax-arg">php,json,zip</span> <span class="syntax-flag">-x</span> <span class="syntax-arg">400,403,500</span></pre></div>
+                </div>
+
+                <h3>▸ Feroxbuster</h3>
+                <p><strong>What & Why:</strong> Written in Rust. The absolute best tool for <strong>recursive</strong> directory busting out of the box.</p>
+                <div class="terminal">
+                    <div class="terminal-body"><pre><span class="syntax-cmd">feroxbuster</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">wordlist.txt</span> <span class="syntax-flag">--depth</span> <span class="syntax-arg">3</span> <span class="syntax-flag">--extract-links</span></pre></div>
+                </div>
+
+                <h3>▸ Caido & Burp Suite <span class="badge protip">Pro Tip</span></h3>
+                <p><strong>What & Why:</strong> Proxies for interception and targeted fuzzing. Caido is the modern, lightweight Rust alternative to Burp Suite (highly recommended in 2026). Use Caido's "Automate" or Burp's "Intruder" for pinpoint parameter manipulation.</p>
+
+                <h3>▸ Nuclei</h3>
+                <p><strong>What & Why:</strong> Template-based vulnerability scanner, but extremely powerful for fuzzing if you write custom YAML templates to detect specific edge cases.</p>
+                <div class="terminal">
+                    <div class="terminal-body"><pre><span class="syntax-cmd">nuclei</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com</span> <span class="syntax-flag">-t</span> <span class="syntax-arg">fuzzing-templates/</span> <span class="syntax-flag">-dast</span></pre></div>
+                </div>
+
+                <h3>▸ Arjun & x8 </h3>
+                <p><strong>What & Why:</strong> Specialized tools for discovering hidden GET/POST parameters.</p>
+                <div class="terminal">
+                    <div class="terminal-body"><pre><span class="syntax-comment"># Arjun</span>
+<span class="syntax-cmd">arjun</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://api.target.com/v1/user</span> <span class="syntax-flag">-m</span> <span class="syntax-arg">GET</span>
+
+<span class="syntax-comment"># x8 (Rust, very fast)</span>
+<span class="syntax-cmd">x8</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">"https://target.com/page?%s=1"</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">params.txt</span></pre></div>
+                </div>
+
+                <h3>▸ Katana & Hakrawler</h3>
+                <p><strong>What & Why:</strong> Crawling tools. You should always crawl to find existing paths BEFORE you start blind fuzzing.</p>
+                <div class="terminal">
+                    <div class="terminal-body"><pre><span class="syntax-cmd">echo</span> <span class="syntax-arg">"https://target.com"</span> | <span class="syntax-cmd">katana</span> <span class="syntax-flag">-jc</span> <span class="syntax-flag">-d</span> <span class="syntax-arg">3</span> | <span class="syntax-cmd">grep</span> <span class="syntax-arg">"\.js$"</span></pre></div>
+                </div>
+            </section>
+
+            <!-- SECTION 3 -->
+            <section id="sec3">
+                <h2>3. WORDLISTS (Recommendations) <span class="badge beginner">Beginner</span></h2>
+                
+                <ul>
+                    <li><strong>Directory/Path:</strong> <code>SecLists/Discovery/Web-Content/raft-large-directories.txt</code> (100k+ entries. Highly effective for general CMS and server paths).</li>
+                    <li><strong>API Endpoints:</strong> <code>SecLists/Discovery/Web-Content/api/api-endpoints.txt</code> (Specific to REST/GraphQL structures).</li>
+                    <li><strong>Parameters:</strong> <code>Burp Suite Param Miner list</code> or <code>SecLists/Discovery/Web-Content/burp-parameter-names.txt</code> (Great for finding hidden SSRF/SQLi inputs).</li>
+                    <li><strong>Subdomains:</strong> <code>jhaddix all.txt</code> or <code>SecLists/Discovery/DNS/subdomains-top1million-110000.txt</code> (The gold standards for DNS brute forcing).</li>
+                </ul>
+                <p><span class="badge protip">Pro Tip</span> Use the custom Python generated lists included in this Masterclass package! They are tailored for modern 2026 stacks (Next.js, Spring, K8s).</p>
+            </section>
+
+            <!-- SECTION 4 -->
+            <section id="sec4">
+                <h2>4. ADVANCED FUZZING TECHNIQUES <span class="badge advanced">Advanced</span></h2>
+                
+                <h3>Smart Filtering (Beating the WAF & Cloudflare)</h3>
+                <p>If a server returns 200 OK for <em>everything</em>, you must filter. <strong>The 2026 meta is using the <code>-ac</code> flag</strong>, but if you need manual control: filter by response size (<code>-fs</code>), line count (<code>-fl</code>), or word count (<code>-fw</code>). Get the baseline size of a fake request (e.g., size is 455), then run: <code>ffuf -w wordlist.txt -u http://target.com/FUZZ -fs 455</code></p>
+
+                <h3>Fuzzing behind Authentication & WAF Bypass</h3>
+                <p>Pass your session cookie to find privileged endpoints, and bypass WAFs by spoofing the IP.</p>
+                <div class="terminal">
+                    <div class="terminal-body"><pre><span class="syntax-cmd">ffuf</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">wordlist.txt</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com/admin/FUZZ</span> <span class="syntax-flag">-H</span> <span class="syntax-arg">"Cookie: session=YOUR_TOKEN"</span> <span class="syntax-flag">-H</span> <span class="syntax-arg">"X-Forwarded-For: 127.0.0.1"</span> <span class="syntax-flag">-ac</span></pre></div>
+                </div>
+
+                <h3>Clusterbomb (Multiple Wordlists)</h3>
+                <p>Fuzzing directories and extensions at the same time.</p>
+                <div class="terminal">
+                    <div class="terminal-body"><pre><span class="syntax-cmd">ffuf</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">dirs.txt:W1</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">exts.txt:W2</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com/W1W2</span> <span class="syntax-mode">-mode</span> <span class="syntax-arg">clusterbomb</span> <span class="syntax-flag">-ac</span></pre></div>
+                </div>
+
+                <h3>REST & GraphQL Endpoint Fuzzing</h3>
+                <p>Found <code>/api/v3/users</code>? Fuzz the version backwards. V1 often lacks security controls. For GraphQL, always fuzz for introspection (<code>__schema</code>) and playgrounds (<code>/graphiql</code>).</p>
+                <div class="terminal">
+                    <div class="terminal-body"><pre><span class="syntax-comment"># API Versioning Bypass</span>
+<span class="syntax-cmd">ffuf</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">versions.txt</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://api.target.com/FUZZ/users</span>
+
+<span class="syntax-comment"># GraphQL Fuzzing</span>
+<span class="syntax-cmd">ffuf</span> <span class="syntax-flag">-w</span> <span class="syntax-arg">graphql-endpoints.txt</span> <span class="syntax-flag">-u</span> <span class="syntax-arg">https://target.com/FUZZ</span> <span class="syntax-flag">-mc</span> <span class="syntax-arg">200</span> <span class="syntax-flag">-ac</span></pre></div>
+                </div>
+            </section>
+
+            <!-- SECTION 5 -->
+            <section id="sec5">
+                <h2>5. UNDERRATED TIPS & TECHNIQUES <span class="badge underrated">Underrated</span></h2>
+                
+                <ul>
+                    <li><span class="badge underrated">Underrated</span> <strong>Fuzzing 403s (The 2026 Way):</strong> If you get a 403 Forbidden on <code>/admin</code>, fuzz bypasses: <code>/admin/</code>, <code>/admin%20/</code>, <code>/%2e/admin</code>, <code>/admin.json</code>, or fuzz headers: <code>-H "X-Custom-IP-Authorization: 127.0.0.1"</code>.</li>
+                    <li><span class="badge underrated">Underrated</span> <strong>FUZZ placement in headers:</strong> Don't just fuzz paths. Fuzz the User-Agent, Origin (CORS bypass), and Host headers for Server-Side Request Forgery (SSRF).</li>
+                    <li><span class="badge underrated">Underrated</span> <strong>Extension Fuzzing:</strong> Always append <code>.json</code> to endpoints. <code>/api/users</code> might be 403, but <code>/api/users.json</code> might bypass auth checks in Spring Boot or Ruby on Rails.</li>
+                    <li><span class="badge underrated">Underrated</span> <strong>S3 Bucket / Cloud Storage Fuzzing:</strong> Fuzz bucket names based on company name: <code>company-dev.s3.amazonaws.com</code>, <code>company-assets.s3.amazonaws.com</code>, or Azure blob storage URLs.</li>
+                    <li><span class="badge underrated">Underrated</span> <strong>JS File Extraction (Source Maps):</strong> Crawl for <code>.js.map</code> files. If found, you can recover the entire readable source code of the frontend and extract hidden API endpoints without fuzzing.</li>
+                    <li><span class="badge underrated">Underrated</span> <strong>Time-Based Fuzzing:</strong> Use Burp Suite or Caido to look for responses that take longer than the average. If <code>/?id=1</code> takes 50ms, but <code>/?id=1' OR SLEEP(5)--</code> takes 5000ms, you have SQLi.</li>
+                    <li><span class="badge underrated">Underrated</span> <strong>IIS Short Name Fuzzing:</strong> On Windows servers, you can fuzz the 8.3 short names to discover hidden configuration files using tools like <code>IIS-ShortName-Scanner</code>.</li>
+                </ul>
+            </section>
+            <!-- SECTION 6 -->
+            <section id="sec6">
+                <h2>6. AI IN FUZZING (2026) <span class="badge advanced">Advanced</span></h2>
+                
+                <p>Modern bug bounty hunters use AI (Claude 3.5+, GPT-4o) to generate <strong>context-aware</strong> wordlists and automate triage.</p>
+                
+                <h3>Prompt Example for Custom Wordlists:</h3>
+                <div class="terminal">
+                    <div class="terminal-body"><pre style="color: #fff; white-space: pre-wrap;">"I am hunting on a target that uses Next.js, Express, and Kubernetes. The main application is a Fintech trading platform. Generate a list of 100 highly probable hidden API endpoints, administrative paths (e.g., actuator/metrics), and sensitive parameter names specific to this modern 2026 tech stack. Output ONLY the paths, one per line."</pre></div>
+                </div>
+
+                <h3>AI-Assisted Response Analysis:</h3>
+                <p>Instead of manually parsing thousands of ffuf outputs, pipe the JSON output of ffuf (<code>-o output.json</code>) into a custom script that uses an LLM API to flag anomalous response sizes, weird HTTP headers, or interesting 403 Forbidden patterns that deviate from the norm.</p>
+
+                <h3>AI + Nuclei Template Generation:</h3>
+                <p>Feed a vulnerable request/response pair to an AI and ask it: <em>"Write a Nuclei YAML template to fuzz for this specific edge case across all subdomains."</em></p>
+            </section>
+
+            <!-- SECTION 7 -->
+            <section id="sec7">
+                <h2>7. BUG BOUNTY CHAINING (2026 META) <span class="badge protip">Pro Tip</span></h2>
+                
+                <p>Finding a path is just step one. You must chain it for impact to get the high payouts.</p>
+
+                <h3>Chain 1: Directory Fuzzing → Exposed Config → Cloud Takeover</h3>
+                <ol>
+                    <li><code>ffuf -w paths.txt -u https://target.com/FUZZ -ac</code> discovers <code>/actuator/env</code>.</li>
+                    <li>Fetch the endpoint to find exposed <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code>.</li>
+                    <li>Use AWS CLI (or Pacu) to authenticate as the compromised IAM user.</li>
+                    <li>Enumerate permissions, find S3 write access, or escalate to EC2 admin.</li>
+                </ol>
+
+                <h3>Chain 2: Parameter Fuzzing → SSRF → Internal API Access</h3>
+                <ol>
+                    <li>Find an endpoint that generates a PDF or fetches an image: <code>/api/v1/export</code>.</li>
+                    <li>Use Arjun: <code>arjun -u https://api.target.com/v1/export -m GET</code>.</li>
+                    <li>Arjun discovers a hidden <code>?url=</code> or <code>?webhook=</code> parameter.</li>
+                    <li>Craft payload: <code>/api/v1/export?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/</code>.</li>
+                    <li>The generated PDF contains the AWS EC2 instance metadata (High/Critical).</li>
+                </ol>
+
+                <h3>Chain 3: API Version Fuzzing → BOLA (IDOR)</h3>
+                <ol>
+                    <li>You observe the app using <code>/api/v3/users/123/profile</code> (and modifying it is protected).</li>
+                    <li>Use ffuf to fuzz the version: <code>ffuf -w versions.txt -u https://api.target.com/FUZZ/users/123/profile</code></li>
+                    <li>You find <code>/api/v1/users/123/profile</code> is still active but lacks authorization checks!</li>
+                    <li>Change the ID to <code>124</code> and successfully modify another user's profile (Account Takeover).</li>
+                </ol>
+
+                <h3>Chain 4: Extension Fuzzing → Source Code Leak → RCE</h3>
+                <ol>
+                    <li>You fuzz extensions on an upload endpoint: <code>ffuf -w exts.txt -u https://target.com/upload/profileFUZZ</code></li>
+                    <li>You discover <code>profile.php.bak</code>.</li>
+                    <li>Downloading it reveals a hardcoded developer database password.</li>
+                    <li>You log into the exposed phpMyAdmin panel and write a web shell into the web root.</li>
+                </ol>
+            </section>
+
+            <!-- SECTION 8 -->
+            <section id="sec8">
+                <h2>8. CHEATSHEET & AUTOMATION <span class="badge beginner">Beginner</span></h2>
+                
+                <button class="collapsible">FFUF Advanced One-Liners</button>
+                <div class="content">
+<div class="terminal"><div class="terminal-body"><pre>
+<span class="syntax-comment"># 1. The Ultimate Blind Fuzz (Auto-calibrate + Rate limit + Output)</span>
+ffuf -w words.txt -u http://target/FUZZ -ac -rate 100 -o results.json
+
+<span class="syntax-comment"># 2. File Extension Fuzzing (Multiple Exts)</span>
+ffuf -w words.txt -u http://target/FUZZ -e .php,.json,.bak,.zip -ac
+
+<span class="syntax-comment"># 3. POST JSON Data Fuzzing</span>
+ffuf -w params.txt -u http://api/target -X POST -d '{"FUZZ":"admin"}' -H "Content-Type: application/json" -ac
+
+<span class="syntax-comment"># 4. Host Header (VHOST) Fuzzing</span>
+ffuf -w subs.txt -u http://target.com -H "Host: FUZZ.target.com" -ac
+
+<span class="syntax-comment"># 5. Fuzzing with a Burp Suite request file</span>
+ffuf -request req.txt -request-proto https -w words.txt -ac
+</pre></div></div>
+                </div>
+
+                <button class="collapsible">Automation Pipeline (Bash)</button>
+                <div class="content">
+<div class="terminal"><div class="terminal-body"><pre>
+<span class="syntax-comment">#!/bin/bash</span>
+<span class="syntax-comment"># Recon -> Crawl -> Fuzz</span>
+subfinder -d $1 -all -silent | httpx -silent > hosts.txt
+katana -list hosts.txt -silent > urls.txt
+ffuf -w paths.txt -u HASH_URL_HERE/FUZZ -mc 200 -o results.json
+</pre></div></div>
+                </div>
+            </section>
+
+            <!-- SECTION 9 -->
+            <section id="sec9">
+                <h2>9. RESOURCES <span class="badge beginner">Beginner</span></h2>
+                <ul>
+                    <li><strong>GitHub Repos:</strong> SecLists (danielmiessler), PayloadAllTheThings, FuzzingTemplates (ProjectDiscovery).</li>
+                    <li><strong>Content Creators:</strong> Jason Haddix (Bug Hunter's Methodology), STÖK, NahamSec, InsiderPhD.</li>
+                    <li><strong>Platforms:</strong> HackerOne, Bugcrowd, Intigriti, YesWeHack.</li>
+                </ul>
+            </section>
+
+            <!-- SECTION 10 -->
+            <section id="sec10">
+                <h2>10. TOP 10 MCQ TEST <span class="badge beginner">Beginner</span></h2>
+                <p>Test your knowledge with these top 10 Fuzzing MCQs:</p>
+
+                <ol>
+                    <li>
+                        <strong>Which flag in ffuf is used to automatically filter out false positives based on a baseline?</strong><br>
+                        A) <code>-fs</code><br>
+                        B) <code>-fw</code><br>
+                        C) <code>-ac</code><br>
+                        D) <code>-fc</code><br>
+                        <button class="reveal-btn" onclick="this.nextElementSibling.style.display='inline'; this.style.display='none'">Reveal Answer</button>
+                        <span class="hidden-answer" style="display:none; color:var(--green); font-weight:bold;">Correct Answer: C) -ac</span>
+                    </li>
+                    <li style="margin-top:15px;">
+                        <strong>When fuzzing for subdomains, which HTTP header is usually modified?</strong><br>
+                        A) User-Agent<br>
+                        B) Host<br>
+                        C) X-Forwarded-For<br>
+                        D) Referer<br>
+                        <button class="reveal-btn" onclick="this.nextElementSibling.style.display='inline'; this.style.display='none'">Reveal Answer</button>
+                        <span class="hidden-answer" style="display:none; color:var(--green); font-weight:bold;">Correct Answer: B) Host</span>
+                    </li>
+                    <li style="margin-top:15px;">
+                        <strong>What kind of vulnerability is most commonly found via Parameter Fuzzing?</strong><br>
+                        A) Subdomain Takeover<br>
+                        B) CSS Injection<br>
+                        C) SSRF & SQLi<br>
+                        D) CORS Misconfiguration<br>
+                        <button class="reveal-btn" onclick="this.nextElementSibling.style.display='inline'; this.style.display='none'">Reveal Answer</button>
+                        <span class="hidden-answer" style="display:none; color:var(--green); font-weight:bold;">Correct Answer: C) SSRF & SQLi</span>
+                    </li>
+                    <li style="margin-top:15px;">
+                        <strong>Which tool is specifically designed for ultra-fast recursive directory fuzzing in Rust?</strong><br>
+                        A) wfuzz<br>
+                        B) dirb<br>
+                        C) arjun<br>
+                        D) feroxbuster<br>
+                        <button class="reveal-btn" onclick="this.nextElementSibling.style.display='inline'; this.style.display='none'">Reveal Answer</button>
+                        <span class="hidden-answer" style="display:none; color:var(--green); font-weight:bold;">Correct Answer: D) feroxbuster</span>
+                    </li>
+                    <li style="margin-top:15px;">
+                        <strong>If an API endpoint <code>/api/v3/users/</code> is secure, what should you fuzz next?</strong><br>
+                        A) The version number (e.g., v1, v2)<br>
+                        B) The HTTP protocol version<br>
+                        C) The TLS certificate<br>
+                        D) The DNS registrar<br>
+                        <button class="reveal-btn" onclick="this.nextElementSibling.style.display='inline'; this.style.display='none'">Reveal Answer</button>
+                        <span class="hidden-answer" style="display:none; color:var(--green); font-weight:bold;">Correct Answer: A) The version number</span>
+                    </li>
+                    <li style="margin-top:15px;">
+                        <strong>What does the <code>-mode clusterbomb</code> flag do in ffuf?</strong><br>
+                        A) Drops all connections immediately.<br>
+                        B) Iterates through multiple wordlists in parallel (1-to-1).<br>
+                        C) Tries every possible combination of multiple wordlists.<br>
+                        D) Sends 10,000 requests per second.<br>
+                        <button class="reveal-btn" onclick="this.nextElementSibling.style.display='inline'; this.style.display='none'">Reveal Answer</button>
+                        <span class="hidden-answer" style="display:none; color:var(--green); font-weight:bold;">Correct Answer: C) Tries every possible combination</span>
+                    </li>
+                    <li style="margin-top:15px;">
+                        <strong>Which tool is highly recommended for parameter discovery in 2026?</strong><br>
+                        A) Arjun / x8<br>
+                        B) nmap<br>
+                        C) subfinder<br>
+                        D) sqlmap<br>
+                        <button class="reveal-btn" onclick="this.nextElementSibling.style.display='inline'; this.style.display='none'">Reveal Answer</button>
+                        <span class="hidden-answer" style="display:none; color:var(--green); font-weight:bold;">Correct Answer: A) Arjun / x8</span>
+                    </li>
+                    <li style="margin-top:15px;">
+                        <strong>Why do hackers append <code>.json</code> to endpoints during fuzzing?</strong><br>
+                        A) To bypass authentication checks in frameworks like Ruby on Rails.<br>
+                        B) To make the request faster.<br>
+                        C) Because JSON is the only accepted format in 2026.<br>
+                        D) To trigger a SQL error.<br>
+                        <button class="reveal-btn" onclick="this.nextElementSibling.style.display='inline'; this.style.display='none'">Reveal Answer</button>
+                        <span class="hidden-answer" style="display:none; color:var(--green); font-weight:bold;">Correct Answer: A) To bypass authentication checks</span>
+                    </li>
+                    <li style="margin-top:15px;">
+                        <strong>What is the best way to utilize AI (like Claude or GPT) in modern fuzzing?</strong><br>
+                        A) Generating context-aware wordlists tailored to a specific tech stack.<br>
+                        B) Letting the AI run nmap scans directly.<br>
+                        C) Asking it for valid passwords.<br>
+                        D) Exploiting memory corruption bugs in C.<br>
+                        <button class="reveal-btn" onclick="this.nextElementSibling.style.display='inline'; this.style.display='none'">Reveal Answer</button>
+                        <span class="hidden-answer" style="display:none; color:var(--green); font-weight:bold;">Correct Answer: A) Generating context-aware wordlists</span>
+                    </li>
+                    <li style="margin-top:15px;">
+                        <strong>What does a 403 Forbidden response sometimes indicate during directory fuzzing?</strong><br>
+                        A) The server is completely offline.<br>
+                        B) A hidden administrative or internal directory exists, but access is restricted.<br>
+                        C) The wordlist is too large.<br>
+                        D) Your IP has been permanently banned.<br>
+                        <button class="reveal-btn" onclick="this.nextElementSibling.style.display='inline'; this.style.display='none'">Reveal Answer</button>
+                        <span class="hidden-answer" style="display:none; color:var(--green); font-weight:bold;">Correct Answer: B) A hidden administrative directory exists</span>
+                    </li>
+                </ol>
+            </section>
+
+            <!-- SECTION 11 -->
+            <section id="sec11">
+                <h2>11. HACKER Q&A <span class="badge beginner">Beginner</span></h2>
+                
+                <p><strong>Q: I'm getting 429 Too Many Requests. What do I do?</strong></p>
+                <p>A: You are hitting a rate limit. Slow down your fuzzing using the <code>-rate</code> flag in ffuf (e.g., <code>-rate 10</code>) and use rotating proxies.</p>
+
+                <p><strong>Q: Should I use a massive 10GB wordlist for every target?</strong></p>
+                <p>A: No. Context is king. A targeted 50k wordlist generated for a specific tech stack (like the ones generated in this masterclass) is far more effective than blindly throwing SecLists at a server.</p>
+
+                <p><strong>Q: What is the difference between ffuf and gobuster?</strong></p>
+                <p>A: <code>ffuf</code> is more versatile—it can fuzz anywhere (headers, JSON bodies, paths). <code>gobuster</code> is primarily designed for directories and DNS, and is sometimes considered slightly more stable for those specific tasks, but lacks the advanced filtering (like <code>-ac</code>) of ffuf.</p>
+
+                <p><strong>Q: How do I handle WAFs that block fuzzing?</strong></p>
+                <p>A: Bypass them by spoofing headers (<code>X-Forwarded-For</code>), using a very low request rate, rotating IPs via tools like <code>fireprox</code>, or finding the origin IP via tools like Censys/Shodan.</p>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Floating Back to Top Button -->
+    <button id="btn-back-to-top" title="Go to top">↑ TOP</button>
+
+    <!-- Footer -->
+    <footer>
+        <div class="neon-text">Keep Learning • Keep Hacking</div>
+        <div class="footer-sig">CybertechAjju</div>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        // Matrix Canvas Animation
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()';
+        const fontSize = 14;
+        const columns = canvas.width / fontSize;
+        const drops = [];
+
+        for (let x = 0; x < columns; x++) {
+            drops[x] = 1;
+        }
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(10, 10, 15, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#0f0'; // Green text
+            ctx.font = fontSize + 'px monospace';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = letters.charAt(Math.floor(Math.random() * letters.length));
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+
+        setInterval(drawMatrix, 50);
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Copy Code Functionality
+        function copyCode(btn) {
+            const pre = btn.parentElement.nextElementSibling.querySelector('pre');
+            const code = pre.innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                const originalText = btn.innerText;
+                btn.innerText = 'Copied!';
+                btn.style.backgroundColor = 'rgba(0, 245, 255, 0.2)';
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.backgroundColor = 'transparent';
+                }, 2000);
+            });
+        }
+
+        // Collapsible sections
+        var coll = document.getElementsByClassName("collapsible");
+        for (let i = 0; i < coll.length; i++) {
+            coll[i].addEventListener("click", function() {
+                this.classList.toggle("active");
+                var content = this.nextElementSibling;
+                if (content.style.maxHeight){
+                    content.style.maxHeight = null;
+                } else {
+                    content.style.maxHeight = content.scrollHeight + "px";
+                } 
+            });
+        }
+
+        // Back to top button
+        let mybutton = document.getElementById("btn-back-to-top");
+        window.onscroll = function() { scrollFunction() };
+
+        function scrollFunction() {
+            if (document.body.scrollTop > 300 || document.documentElement.scrollTop > 300) {
+                mybutton.style.display = "block";
+            } else {
+                mybutton.style.display = "none";
+            }
+            
+            // Active sidebar highlighting
+            let sections = document.querySelectorAll('section');
+            let navLinks = document.querySelectorAll('.sidebar a');
+            
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.classList.add('active');
+                }
+            });
+        }
+
+        mybutton.addEventListener("click", function() {
+            document.body.scrollTop = 0;
+            document.documentElement.scrollTop = 0;
+        });
+    </script>
+</body>
+</html>
